@@ -1,0 +1,1501 @@
+================================================================================
+IMPLEMENTATION NOTES
+FDE Staffing Intelligence Platform - Technical Deep Dive
+================================================================================
+
+
+TABLE OF CONTENTS
+================================================================================
+
+1. PROJECT STRUCTURE EXPLAINED
+2. PYTHON FILES AND THEIR ROLES
+3. DATASET SCHEMAS AND USE CASES
+4. WHY SEPARATE CSVs
+5. SOLUTION MAPPING TO CASE STUDY REQUIREMENTS
+6. DASHBOARD PAGES DETAILED DESIGN
+7. FUTURE ROADMAP AND EXTENSIBILITY
+8. CODE QUALITY AND STANDARDS
+9. TESTING AND VALIDATION
+10. DEPLOYMENT CONSIDERATIONS
+
+
+1. PROJECT STRUCTURE EXPLAINED
+================================================================================
+
+fde_staffing_ai/
+│
+├── app.py
+│   └─ Main Streamlit application entry point
+│      Responsible for: App initialization, multi-page routing, data caching
+│      Size: ~200-300 lines
+│      Complexity: Low (orchestration only)
+│
+├── requirements.txt
+│   └─ Python package dependencies
+│      Lists: streamlit, pandas, faker, openpyxl
+│      Versions: Pinned for reproducibility
+│
+├── README.txt (THIS FILE)
+│   └─ Business-level project documentation
+│      Audience: Non-technical stakeholders, project sponsors
+│
+├── architecture_explainer.txt
+│   └─ System design and philosophy documentation
+│      Audience: Architects, security, compliance teams
+│
+├── implementation_notes.txt
+│   └─ Technical implementation details
+│      Audience: Development team, future maintainers
+│
+├── data/
+│   │
+│   ├── employees.csv
+│   │   └─ Employee master records (40 records)
+│   │      Primary key: employee_id
+│   │      Use case: Populate workforce dashboards, tracking
+│   │
+│   ├── employee_skills.csv
+│   │   └─ Skills inventory with proficiency (120-150 records)
+│   │      Foreign key: employee_id
+│   │      Use case: Core input to matching engine recommendations
+│   │
+│   ├── certifications.csv
+│   │   └─ Certifications and compliance (60-80 records)
+│   │      Foreign key: employee_id
+│   │      Use case: Compliance tracking, risk flagging
+│   │
+│   ├── project_history.csv
+│   │   └─ Historical project assignments (200+ records)
+│   │      Foreign key: employee_id
+│   │      Use case: Experience assessment, delivery patterns
+│   │
+│   ├── availability.csv
+│   │   └─ Current allocation status (40 records, 1 per employee)
+│   │      Foreign key: employee_id
+│   │      Use case: Capacity planning, deployment readiness
+│   │
+│   ├── opportunities.csv
+│   │   └─ Staffing demand and openings (15 records)
+│   │      Primary key: opportunity_id
+│   │      Use case: Target for recommendations, demand tracking
+│   │
+│   └── self_assessment.csv
+│       └─ Career development and preferences (40 records, 1 per employee)
+│          Foreign key: employee_id
+│          Use case: Career alignment, engagement tracking
+│
+├── scripts/
+│   │
+│   ├── generate_sample_data.py
+│   │   └─ Data generation and seeding
+│   │      Creates: All CSV files in data/ directory
+│   │      Technology: Faker library for realistic synthetic data
+│   │      Execution: Run once to initialize platform
+│   │      Size: ~300 lines
+│   │
+│   └── matching_engine.py
+│       └─ Core recommendation and matching logic
+│          Functions: Score employees, rank candidates, generate explanations
+│          Core algorithms: Multi-dimensional scoring, transparency generation
+│          Size: ~400-500 lines
+│          Complexity: Medium (algorithmic logic)
+│
+└── pages/
+    │
+    ├── dashboard.py
+    │   └─ Workforce analytics and KPI dashboard
+    │      Features: Composition, skills, sector distribution, utilization
+    │      Sections: Key metrics, charts, filters, drill-down
+    │      Size: ~300-400 lines
+    │      Complexity: Medium (visualization and aggregation)
+    │
+    ├── recommendations.py
+    │   └─ AI-assisted staffing recommendation interface
+    │      Features: Opportunity selection, candidate ranking, explanations
+    │      Workflow: Select opportunity → See ranked candidates → Allocate
+    │      Size: ~350-450 lines
+    │      Complexity: High (integration, interactivity)
+    │
+    └── allocation.py
+        └─ Allocation tracking and capacity planning
+           Features: Current assignments, bench tracking, forecasting
+           Sections: Current projects, upcoming opportunities, capacity view
+           Size: ~250-350 lines
+           Complexity: Medium (data aggregation and presentation)
+
+
+2. PYTHON FILES AND THEIR ROLES
+================================================================================
+
+app.py (Main Application)
+──────────────────────────
+
+Purpose: Bootstrap and orchestrate the Streamlit application
+
+Key Responsibilities:
+  • Initialize Streamlit configuration (theme, layout, page settings)
+  • Load and cache data from CSV files
+  • Set up multi-page navigation
+  • Implement global error handling
+  • Manage session state (user selections, filters)
+  • Coordinate between pages
+
+Structure:
+  ```
+  import streamlit as st
+  import pandas as pd
+  from scripts.matching_engine import MatchingEngine
+
+  # Configuration
+  st.set_page_config(...)
+  
+  # Data Loading (Cached)
+  @st.cache_data
+  def load_data():
+      # Load all CSV files
+      # Join tables
+      # Return unified data structures
+  
+  # Session State
+  if 'selected_opportunity' not in st.session_state:
+      st.session_state.selected_opportunity = None
+  
+  # Sidebar Navigation
+  page = st.sidebar.radio("Navigation", [...])
+  
+  # Route to appropriate page
+  if page == "Dashboard":
+      from pages.dashboard import show_dashboard
+      show_dashboard(data)
+  ```
+
+Why This Design:
+  ✓ Centralized data loading (single source of truth)
+  ✓ Caching prevents redundant CSV reads
+  ✓ Session state preserves user interactions across pages
+  ✓ Single entry point for troubleshooting
+  ✓ Easy to add authentication/logging layer
+
+
+scripts/generate_sample_data.py
+────────────────────────────────
+
+Purpose: Create realistic sample datasets for initial platform population
+
+Why Separate Script:
+  • Reusable for data refresh/regeneration
+  • Can be run independently on schedule
+  • Supports different data volumes for testing
+  • Future: Can be adapted for production data import
+
+Key Functions:
+  
+  generate_employees(n=40)
+  └─ Creates employee master records
+     Uses Faker for realistic names, emails, locations
+     Realistic distribution of seniority levels
+     Sector experience both primary and secondary
+  
+  generate_skills(employees_df)
+  └─ Creates skills inventory
+     Links skills to employees probabilistically
+     Seniority affects proficiency distribution
+     Output: 3-8 skills per employee
+  
+  generate_certifications(employees_df)
+  └─ Creates certification records
+     More certifications for senior staff
+     Realistic issue/expiry dates
+     Status tracking (active/expired)
+  
+  generate_project_history(employees_df)
+  └─ Creates project assignments
+     Multiple projects per employee
+     Complexity and sector variation
+     Allocation percentages and delivery status
+  
+  generate_availability(employees_df)
+  └─ Creates current availability snapshots
+     Current workload and available capacity
+     Mobility and remote work preferences
+     Real-time status for deployment
+  
+  generate_opportunities(n=15)
+  └─ Creates staffing demand
+     Required skills and seniority
+     Location and sector requirements
+     Priority and timeline
+  
+  generate_self_assessment(employees_df)
+  └─ Creates career development data
+     Career goals and learning preferences
+     Engagement scores
+     Development priorities
+
+Output:
+  All functions save directly to CSV files in data/ directory
+  Success message confirms generation complete
+  Platform ready to launch immediately after
+
+
+scripts/matching_engine.py
+──────────────────────────
+
+Purpose: Core algorithmic engine for staffing recommendations
+
+This is the intellectual property of the platform - the core IP
+
+Key Components:
+
+  1. MatchingEngine Class
+     ├─ __init__: Load all data sources
+     ├─ score_employee_for_opportunity: Calculate multi-dimensional score
+     ├─ rank_candidates: Sort all employees for opportunity
+     ├─ generate_explanation: Create transparency narrative
+     └─ flag_risks: Identify concerns for decision-makers
+
+  2. Scoring Functions (One per dimension)
+     ├─ score_skill_match(employee, opportunity)
+     ├─ score_seniority(employee, opportunity)
+     ├─ score_sector_fit(employee, opportunity)
+     ├─ score_availability(employee, opportunity)
+     ├─ score_certification(employee, opportunity)
+     ├─ score_career_alignment(employee, opportunity)
+     └─ score_location_fit(employee, opportunity)
+
+  3. Explanation Generator
+     ├─ explain_scoring: Detailed breakdown
+     ├─ explain_strengths: What makes candidate good fit
+     ├─ explain_considerations: Concerns or risks
+     └─ generate_recommendation_text: Summary statement
+
+  4. Utility Functions
+     ├─ calculate_skill_proficiency_score: Score from proficiency level
+     ├─ time_until_available: Days until employee can start
+     ├─ sector_match_strength: Quality of sector alignment
+     └─ certification_status: Active vs. expired vs. missing
+
+Example Usage:
+  ```
+  engine = MatchingEngine(data)
+  recommendations = engine.rank_candidates(opportunity_id=2001)
+  
+  for rank, employee_rec in enumerate(recommendations[:5], 1):
+      print(f"{rank}. {employee_rec['name']}")
+      print(f"   Score: {employee_rec['overall_score']}")
+      print(f"   Rationale: {employee_rec['explanation']}")
+  ```
+
+Design Decisions:
+  ✓ Separate functions per scoring dimension (testable)
+  ✓ All scores 0-100 (normalized, comparable)
+  ✓ Weights configurable (business logic adjustable)
+  ✓ No external ML libraries (explainable, lightweight)
+  ✓ Comprehensive scoring rationale (transparent)
+
+
+pages/dashboard.py
+────────────────────
+
+Purpose: Display workforce analytics and key metrics
+
+Sections:
+
+  1. KEY METRICS (Top)
+     ├─ Total Workforce (40)
+     ├─ Average Seniority Level
+     ├─ Bench Capacity (% available)
+     └─ Sector Coverage (# of sectors)
+
+  2. WORKFORCE COMPOSITION
+     ├─ Seniority distribution (pie/bar chart)
+     ├─ Primary sectors (horizontal bar)
+     ├─ Location distribution (map-style)
+     └─ Headcount trends (line chart)
+
+  3. SKILLS INVENTORY
+     ├─ Top skills (bar chart)
+     ├─ Skill proficiency distribution
+     ├─ Skill gaps (required vs. available)
+     └─ Skills search/filter
+
+  4. AVAILABILITY & ALLOCATION
+     ├─ Bench capacity gauge
+     ├─ Current allocation heatmap
+     ├─ Upcoming availability
+     └─ Utilization metrics
+
+  5. CERTIFICATION STATUS
+     ├─ Active vs. expired breakdown
+     ├─ Expiring soon alerts
+     ├─ Certification by issuing body
+     └─ Compliance dashboard
+
+  6. SECTOR EXPERIENCE
+     ├─ Coverage by sector
+     ├─ Depth of experience (years)
+     ├─ Cross-sector diversity
+     └─ Sector specialization
+
+Features:
+  • Filters for drill-down (seniority, sector, location)
+  • Interactive charts (click to explore)
+  • Data export to CSV
+  • Refresh capability
+  • Mobile responsive
+
+
+pages/recommendations.py
+────────────────────────
+
+Purpose: AI-assisted staffing recommendation interface
+
+Workflow:
+
+  STEP 1: OPPORTUNITY SELECTION
+  ├─ Dropdown or search to select opportunity
+  ├─ Displays opportunity details (skills, seniority, duration)
+  └─ Shows "Find Candidates" button
+
+  STEP 2: CANDIDATE RANKING
+  ├─ Runs matching engine
+  ├─ Displays top 10 candidates ranked by score
+  ├─ Shows quick stats (name, seniority, score)
+  └─ Expandable for details
+
+  STEP 3: DETAILED REVIEW
+  ├─ Click candidate to expand
+  ├─ Show scoring breakdown (all 7 dimensions)
+  ├─ Display explanation narrative
+  ├─ Highlight strengths and considerations
+  ├─ Flag any risks (red/yellow)
+  └─ Compare to other candidates
+
+  STEP 4: ALLOCATION
+  ├─ "Allocate" button for selected candidate
+  ├─ Updates availability status
+  ├─ Confirms opportunity status change
+  └─ Returns to selection for next opportunity
+
+Additional Features:
+  • Comparison mode (side-by-side candidate view)
+  • Filter recommendations (seniority range, sector required, etc.)
+  • Export recommendation details
+  • Save recommendations to history
+  • Feedback mechanism (rate recommendation quality later)
+
+Design:
+  • Large, clear scoring display (0-100 number prominent)
+  • Color-coded scores (90-100: green, 70-89: yellow, <70: red)
+  • Narrative explanations in plain English
+  • Risk flags immediately visible
+  • One-click allocation minimizes friction
+
+
+pages/allocation.py
+─────────────────────
+
+Purpose: Track current allocations and capacity planning
+
+Sections:
+
+  1. CURRENT ALLOCATIONS
+     ├─ Table of active assignments
+     ├─ Employee name, opportunity, sector, duration
+     ├─ Start/end dates and allocation %
+     ├─ Sort/filter by employee, opportunity, sector
+     └─ "De-allocate" button for removing assignments
+
+  2. BENCH TRACKING
+     ├─ Employees not allocated to opportunities
+     ├─ Available %, next available date
+     ├─ Current project assignments (from history)
+     ├─ Ready-to-deploy candidates
+     └─ "Allocate" button to quick-assign
+
+  3. UPCOMING OPPORTUNITIES
+     ├─ Opportunities not yet filled
+     ├─ Days until start date
+     ├─ Required seniority and skills
+     ├─ Priority flag
+     └─ "View Recommendations" quick link
+
+  4. CAPACITY FORECAST
+     ├─ Projected utilization (next 90 days)
+     ├─ Bench depletion timeline
+     ├─ Sector-specific capacity
+     ├─ Risk of over-allocation
+     └─ Hiring recommendations if needed
+
+  5. ALLOCATION SUMMARY
+     ├─ Total workforce: 40
+     ├─ Allocated: X (X%)
+     ├─ Bench: Y (Y%)
+     ├─ Upcoming (next 30 days): Z
+     └─ Utilization efficiency metrics
+
+Features:
+  • Export allocation plan to Excel
+  • Multi-month forecasting
+  • Scenario modeling (what-if analysis)
+  • Alert system for over-allocation
+  • Historical allocation trends
+
+
+3. DATASET SCHEMAS AND USE CASES
+================================================================================
+
+EMPLOYEES.CSV
+──────────────
+
+Use Cases:
+  ✓ Dashboard: Count headcount, distribution by seniority/sector
+  ✓ Matching: Candidate pool for opportunity matching
+  ✓ Allocation: Map employees to assignments and projects
+  ✓ Career: Join with self-assessment for career tracking
+
+Query Examples:
+  • "Show me all Senior analysts in Healthcare sector"
+  • "List employees available to start within 2 weeks"
+  • "What's the gender/diversity breakdown?" (for future expansion)
+
+Design Rationale:
+  • Seniority level enables capability-aware matching
+  • Primary/secondary sectors capture specialization depth
+  • Years experience provides context for skill interpretation
+  • Manager_id enables org structure visualization (future)
+
+
+EMPLOYEE_SKILLS.CSV
+──────────────────────
+
+Use Cases:
+  ✓ Matching: Core input to skill score calculation
+  ✓ Dashboard: Inventory and gap analysis
+  ✓ Recommendations: "What skills does this candidate have?"
+  ✓ Development: "Where do we have skill gaps?"
+
+Query Examples:
+  • "Who are our Python experts?"
+  • "Do we have SQL skills at Expert level available in next 2 weeks?"
+  • "What's the proficiency distribution for Power BI?"
+
+Design Rationale:
+  • Skill_name is standardized list (no typos, consistent matching)
+  • Proficiency level (not binary yes/no) captures nuance
+  • Years of experience provides context
+  • Multi-row per employee enables complex skill profiles
+
+
+CERTIFICATIONS.CSV
+────────────────────
+
+Use Cases:
+  ✓ Matching: Certification requirements vs. employee certs
+  ✓ Compliance: Track expiry dates, alert for renewals
+  ✓ Risk Flagging: Red flags for critical cert expiries
+  ✓ Dashboard: Certification status reporting
+
+Query Examples:
+  • "Who has active AWS certifications?"
+  • "Which certifications expire in the next 3 months?"
+  • "Do we meet PMP certification requirements for this project?"
+
+Design Rationale:
+  • Issue/expiry dates enable compliance tracking
+  • Status field (active/expired) quick-filters
+  • Issuing body provides verification context
+  • Separate table (not embedded in employees) enables many-to-many
+
+
+PROJECT_HISTORY.CSV
+──────────────────────
+
+Use Cases:
+  ✓ Matching: Sector experience assessment
+  ✓ Matching: Delivery track record (on-time completion)
+  ✓ Dashboard: Project analytics and trends
+  ✓ Career: Experience narrative building
+
+Query Examples:
+  • "How many Aviation sector projects has Jane worked on?"
+  • "Show me complex (High/Critical) projects this employee led"
+  • "What's their on-time delivery rate?"
+
+Design Rationale:
+  • Complexity field enables risk assessment
+  • Role field captures progression (Analyst → Lead)
+  • Sector enables experience tracking
+  • Multiple records per employee creates experience history
+
+
+AVAILABILITY.CSV
+───────────────────
+
+Use Cases:
+  ✓ Matching: Availability score input
+  ✓ Allocation: Current bench capacity
+  ✓ Dashboard: Utilization metrics
+  ✓ Planning: Forecasting when people will be available
+
+Query Examples:
+  • "Who's available to start in the next 2 weeks?"
+  • "What's our total bench capacity (%)?"
+  • "Who are willing to relocate for opportunities?"
+
+Design Rationale:
+  • Separate table enables frequent updates (not in master employees)
+  • Available % captures partial availability (scaling)
+  • Next_available_date enables timeline-aware matching
+  • Mobility/remote preferences capture practical constraints
+
+
+OPPORTUNITIES.CSV
+────────────────────
+
+Use Cases:
+  ✓ Matching: Target for matching engine
+  ✓ Recommendations: Opportunity details display
+  ✓ Allocation: Track opportunity status
+  ✓ Demand: Business requirements input
+
+Query Examples:
+  • "What opportunities are we trying to fill?"
+  • "Are we staffing enough Aviation projects?"
+  • "What critical opportunities are open?"
+
+Design Rationale:
+  • Required_skills is comma-separated (enables flexible matching)
+  • Seniority level enables capability-based matching
+  • Duration in weeks enables calendar-aware scheduling
+  • Priority enables opportunity ranking
+
+
+SELF_ASSESSMENT.CSV
+──────────────────────
+
+Use Cases:
+  ✓ Matching: Career alignment score
+  ✓ Engagement: Engagement score displays
+  ✓ Development: Career goal tracking
+  ✓ Dashboard: Career development metrics
+
+Query Examples:
+  • "Who wants to work in Healthcare sector?"
+  • "Which employees are seeking promotions?"
+  • "Show me high-engagement employees available for development"
+
+Design Rationale:
+  • Career goals enable alignment-based matching
+  • Engagement score shows motivational factor
+  • Learning preferences inform assignment fit
+  • Capture preferences for future analysis
+
+
+4. WHY SEPARATE CSVs
+================================================================================
+
+ARCHITECTURAL DECISION: NORMALIZED DATA MODEL
+
+Instead of one big CSV, we use normalized relational-style CSVs.
+
+Advantages:
+──────────
+
+✓ DATA INTEGRITY
+  • Foreign key relationships prevent orphaned records
+  • No duplicate data (e.g., employee name repeated for each skill)
+  • Updates in one place propagate everywhere
+  • Easier to maintain consistency
+
+✓ QUERY EFFICIENCY
+  • Join employee with skills only when matching needed
+  • Dashboard can aggregate available% without loading full history
+  • Faster filtering and searching
+  • Scales to 1000s of records easily
+
+✓ FLEXIBILITY
+  • Easy to add new skills or certifications without modifying master record
+  • Can track many-to-many relationships (employee ↔ skills)
+  • Simple to add new attributes without schema migration
+
+✓ ANALYTICS
+  • Can analyze skill distributions independently
+  • Certification trends visible separate from employee records
+  • Project complexity independent analysis
+  • Composable for custom reports
+
+✓ DATA QUALITY
+  • Standardized skill names (no "Python" vs. "python" vs. "Py")
+  • Certification status clearly tracked
+  • Proficiency levels constrained to valid set
+  • Easier to validate and clean
+
+Alternative (Not Used): Single Big CSV
+──────────────────────────────────────
+
+employees.csv with columns:
+  id, name, seniority, skill1_name, skill1_prof, skill2_name, skill2_prof,
+  skill3_name, skill3_prof, cert1_name, cert1_exp, cert2_name, cert2_exp, ...
+
+Problems:
+  ✗ Fixed number of skills per employee (not scalable)
+  ✗ Massive repeated data (employee name in every row)
+  ✗ Hard to query ("skill1_prof is null" not clear)
+  ✗ Difficult to validate (skill names scattered across columns)
+  ✗ Not extensible (new skill means new columns)
+
+Why Separate is Better:
+  The normalized approach trades slight complexity in joining for massive
+  gains in data quality, queryability, and maintainability.
+
+
+5. SOLUTION MAPPING TO CASE STUDY REQUIREMENTS
+================================================================================
+
+CASE STUDY REQUIREMENT → SOLUTION COMPONENT
+────────────────────────────────────────────
+
+"Professional AI-assisted staffing platform"
+  → Streamlit web application with modern UI design
+
+"Forward Deployed Engineer staffing"
+  → 40 realistic employee profiles with seniority and sector mix
+  → Sector tracking (Healthcare, Aviation, Transport, Banking, etc.)
+
+"Interview case study showcase"
+  → Comprehensive documentation (README, architecture, implementation notes)
+  → Code quality and professional structure
+  → Explainable recommendation logic (not black box)
+
+"Employee profile management"
+  → employees.csv: Master records with demographic and employment info
+  → Comprehensive fields (seniority, sector, location, experience)
+  → Dashboard showing workforce composition
+
+"Skills tracking"
+  → employee_skills.csv: Technical and functional skills inventory
+  → Proficiency levels capturing capability nuance
+  → Dashboard showing skill distribution and gaps
+
+"Certifications"
+  → certifications.csv: Professional certifications with expiry tracking
+  → Compliance dashboard showing active/expired status
+  → Risk flags for expiring certifications
+
+"Project history"
+  → project_history.csv: 200+ project assignments per employee
+  → Complexity and sector tracking for experience assessment
+  → Delivery status showing track record
+
+"Availability and allocation tracking"
+  → availability.csv: Real-time capacity and scheduling status
+  → Allocation page showing current assignments
+  → Capacity forecasting for planning
+
+"Staffing opportunity matching"
+  → matching_engine.py: Multi-dimensional scoring algorithm
+  → opportunities.csv: Staffing demand to match against
+  → Recommendations page: Ranked candidates for each opportunity
+
+"AI-assisted recommendation explanations"
+  → Detailed scoring breakdown (7 dimensions)
+  → Rationale narratives explaining why candidate is good/risky fit
+  → Transparency-first design (not black box)
+
+"Dashboards and analytics"
+  → dashboard.py: Comprehensive workforce analytics
+  → Allocation.py: Capacity and utilization tracking
+  → Recommendations.py: Recommendation interface
+
+"Explainable recommendation logic"
+  → Every recommendation shows scoring for each factor
+  → Plain-English explanations of strengths/considerations
+  → Risk flags visible to decision-maker
+
+"Operational analytics"
+  → Skill gap analysis
+  → Sector coverage assessment
+  → Utilization and bench tracking
+  → Certification compliance reporting
+
+"Human decision support"
+  → System recommends, human decides
+  → Recommendations include override capability
+  → Full transparency for informed decisions
+
+"Scalable architecture"
+  → Modular code structure (data, logic, presentation separate)
+  → CSV-based storage scales to 1000s of records
+  → Recommendation logic parallelizable
+  → Clear extension points for future enhancements
+
+"Enterprise-ready appearance"
+  → Professional Streamlit styling
+  → Structured data presentation
+  → KPI dashboards
+  → Export capabilities
+  → Documentation for non-technical stakeholders
+
+
+6. DASHBOARD PAGES DETAILED DESIGN
+================================================================================
+
+DASHBOARD.PY SECTIONS (Detailed)
+──────────────────────────────────
+
+HEADER
+├─ Title: "Workforce Analytics Dashboard"
+├─ Subtitle: "FDE Staffing Intelligence Platform"
+├─ Last updated: Timestamp
+└─ Refresh button
+
+SECTION 1: KEY METRICS (KPI CARDS)
+├─ Total Workforce: 40
+│  └─ Explanation: Total employees in system
+├─ Average Seniority: Mid-Level
+│  └─ Explanation: Typical career stage
+├─ Bench Capacity: 45%
+│  └─ Explanation: % of workforce available for new assignments
+└─ Sector Coverage: 8
+   └─ Explanation: Number of distinct industry sectors covered
+
+SECTION 2: WORKFORCE COMPOSITION
+├─ LEFT: Seniority Distribution (Pie Chart)
+│  ├─ Junior: 8 (20%)
+│  ├─ Mid-Level: 12 (30%)
+│  ├─ Senior: 12 (30%)
+│  ├─ Lead: 5 (13%)
+│  └─ Principal: 3 (7%)
+│
+├─ RIGHT: Primary Sectors (Horizontal Bar)
+│  ├─ Banking: 6
+│  ├─ Healthcare: 5
+│  ├─ Government: 5
+│  ├─ Energy: 4
+│  ├─ Transport: 4
+│  ├─ Aviation: 4
+│  ├─ Insurance: 4
+│  └─ Retail: 2
+│
+└─ BOTTOM: Location Distribution
+   ├─ London: 15
+   ├─ Manchester: 8
+   ├─ Birmingham: 7
+   ├─ Remote: 6
+   ├─ Other: 4
+   └─ Geographic coverage map
+
+SECTION 3: SKILLS INVENTORY
+├─ TOP: Top 10 Skills (Bar Chart)
+│  ├─ Python: 28 people
+│  ├─ SQL: 26 people
+│  ├─ Azure: 18 people
+│  ├─ Power BI: 16 people
+│  └─ ... (6 more)
+│
+├─ LEFT: Proficiency Distribution for selected skill
+│  ├─ Beginner: 3 (10%)
+│  ├─ Intermediate: 10 (36%)
+│  ├─ Advanced: 11 (39%)
+│  └─ Expert: 4 (14%)
+│
+├─ RIGHT: Skill Gaps Analysis
+│  ├─ "Top 5 skills missing from workforce"
+│  ├─ Shows skills frequently demanded but not available
+│  ├─ Suggests development priorities
+│  └─ Enables recruitment planning
+│
+└─ SEARCH/FILTER
+   ├─ Skill name search
+   ├─ Proficiency level filter
+   └─ Results show employees with that skill
+
+SECTION 4: AVAILABILITY & ALLOCATION
+├─ TOP: Bench Capacity Gauge
+│  ├─ Total available: 18 people (45%)
+│  ├─ Partially available: 8 people (20%)
+│  ├─ Fully allocated: 14 people (35%)
+│  └─ Visual gauge showing capacity
+│
+├─ LEFT: Allocation Timeline (Line Chart)
+│  ├─ X-axis: Next 90 days
+│  ├─ Y-axis: Utilization percentage
+│  └─ Shows projection if current trends continue
+│
+└─ RIGHT: Current Allocations by Sector
+   ├─ Healthcare: 5 allocated
+   ├─ Aviation: 4 allocated
+   ├─ Banking: 3 allocated
+   └─ ... breakdown by sector
+
+SECTION 5: CERTIFICATION STATUS
+├─ Overview: Compliance Dashboard
+│  ├─ Total certifications: 85
+│  ├─ Active: 72 (85%)
+│  ├─ Expiring soon (0-3 months): 8 (9%)
+│  ├─ Expired: 5 (6%)
+│  └─ STATUS → Color-coded (Green/Yellow/Red)
+│
+├─ Expiring Soon Alert
+│  ├─ Lists certifications expiring in next 3 months
+│  ├─ Employee name, certification, expiry date
+│  ├─ Renewal priority flag
+│  └─ Renewal recommendation
+│
+├─ By Issuing Body
+│  ├─ Microsoft: 25
+│  ├─ AWS: 22
+│  ├─ Google: 15
+│  ├─ Other: 23
+│  └─ Certification trend analysis
+│
+└─ Compliance Filter
+   ├─ Show "Expiring Soon" employees
+   ├─ Enable renewal tracking
+   └─ Support compliance reporting
+
+SECTION 6: SECTOR EXPERIENCE
+├─ Sector Coverage Map
+│  ├─ Each sector shows: Total people, Avg years, Max depth
+│  ├─ Healthcare: 8 people, Avg 6.5 years
+│  ├─ Aviation: 6 people, Avg 8 years
+│  └─ Coverage strength visualization
+│
+├─ Cross-Sector Experience
+│  ├─ How many people have multi-sector experience?
+│  ├─ Breadth vs. Depth trade-off
+│  ├─ Specialists vs. Generalists breakdown
+│  └─ Risk: Over-specialization in one sector
+│
+└─ Experience Depth Analysis
+   ├─ Distribution of years in primary sector
+   ├─ Expert-level specialists (10+ years)
+   ├─ Emerging specialists (3-5 years)
+   └─ Capability building trends
+
+FILTERING & EXPORT
+├─ Seniority Level Filter (multi-select)
+├─ Sector Filter (multi-select)
+├─ Location Filter (multi-select)
+├─ Availability Filter (benchmarks, allocated, all)
+├─ Dynamic chart updates on filter change
+└─ Export to CSV button (analytics-ready format)
+
+
+RECOMMENDATIONS.PY DETAILED WORKFLOW
+──────────────────────────────────────
+
+STEP 1: OPPORTUNITY SELECTION
+┌────────────────────────────────────────────────────┐
+│  SELECT STAFFING OPPORTUNITY                       │
+├────────────────────────────────────────────────────┤
+│                                                    │
+│  [Opportunity Selector Dropdown ▼]                │
+│  (or search: _________________________ )           │
+│                                                    │
+│  ┌──────────────────────────────────────────────┐ │
+│  │ SELECTED: Opportunity 2001                   │ │
+│  │                                              │ │
+│  │ Senior Data Engineer - Healthcare Sector     │ │
+│  │ ───────────────────────────────────────────  │ │
+│  │ Sector: Healthcare                          │ │
+│  │ Required Seniority: Senior                  │ │
+│  │ Required Skills: Python, SQL, Azure, DAX    │ │
+│  │ Location: London (or Remote)                │ │
+│  │ Duration: 12 weeks                          │ │
+│  │ Start Date: 2024-02-15                      │ │
+│  │ Status: Open                                │ │
+│  │ Priority: High                              │ │
+│  │                                              │ │
+│  │ Description: We seek a senior data engineer │ │
+│  │ to lead healthcare analytics modernization  │ │
+│  │ program...                                   │ │
+│  └──────────────────────────────────────────────┘ │
+│                                                    │
+│  [FIND CANDIDATES] button (blue, prominent)      │
+│                                                    │
+└────────────────────────────────────────────────────┘
+
+STEP 2: CANDIDATE RANKING
+┌────────────────────────────────────────────────────┐
+│  CANDIDATE RECOMMENDATIONS                        │
+│  (Ranked by Overall Score)                        │
+├────────────────────────────────────────────────────┤
+│                                                    │
+│  Filters: [Seniority] [Sector] [Availability]    │
+│  ──────────────────────────────────────────────── │
+│                                                    │
+│  RANK 1 | SCORE: 87 | Jane Smith [EXPAND ▼]     │
+│  ├─ Seniority: Senior                            │
+│  ├─ Current Allocation: 60%                      │
+│  ├─ Sector Match: Healthcare (Primary)           │
+│  └─ Key Score Drivers: Excellent skill match (92),│
+│     Healthcare expertise, Available              │
+│                                                    │
+│  RANK 2 | SCORE: 79 | Robert Johnson [EXPAND ▼] │
+│  ├─ Seniority: Senior                            │
+│  ├─ Current Allocation: 80%                      │
+│  ├─ Sector Match: Aviation (Secondary)           │
+│  └─ Key Score Drivers: Strong skills (85), Senior│
+│     level, Limited availability                  │
+│                                                    │
+│  RANK 3 | SCORE: 71 | Sarah Williams [EXPAND ▼] │
+│  ├─ Seniority: Senior                            │
+│  ├─ Current Allocation: 40%                      │
+│  ├─ Sector Match: Banking (Not primary)          │
+│  └─ Key Score Drivers: Good skills (75), Available│
+│     but needs sector knowledge                   │
+│                                                    │
+│  ... (4-7 more candidates shown)                 │
+│                                                    │
+└────────────────────────────────────────────────────┘
+
+STEP 3: DETAILED REVIEW (Click to Expand)
+┌────────────────────────────────────────────────────┐
+│  CANDIDATE PROFILE - JANE SMITH (Employee 1005)   │
+├────────────────────────────────────────────────────┤
+│                                                    │
+│  OVERALL MATCH SCORE: 87/100 ███████░░ EXCELLENT │
+│                                                    │
+│  ────────────────────────────────────────────────  │
+│  SCORING BREAKDOWN                               │
+│  ────────────────────────────────────────────────  │
+│                                                    │
+│  Skill Match ...................... 92/100 ✓    │
+│    Required: Python, SQL, Azure, DAX             │
+│    Employee has: Python (Expert), SQL (Advanced),│
+│    Azure (Advanced), DAX (Intermediate)          │
+│    → 4/4 skills, Avg proficiency: 92%            │
+│                                                    │
+│  Seniority Alignment .............. 100/100 ✓   │
+│    Required: Senior                              │
+│    Employee: Senior (exact match)                │
+│    → No over/under qualification concerns        │
+│                                                    │
+│  Sector Experience ................ 80/100 ✓    │
+│    Required: Healthcare                          │
+│    Primary Sector: Healthcare (5 years)          │
+│    → Direct healthcare experience                │
+│    Secondary Sector: Banking (3 years)           │
+│    → Cross-sector knowledge valuable             │
+│                                                    │
+│  Availability ..................... 85/100 ✓    │
+│    Current Allocation: 60%                       │
+│    Available: 40%                                │
+│    Next Available: 2024-01-22 (2 weeks)          │
+│    Duration Needed: 12 weeks                     │
+│    → Can accommodate, slight timeline gap        │
+│                                                    │
+│  Certifications ................... 90/100 ✓    │
+│    AWS Solutions Architect: Active (exp 6mo)    │
+│    Azure Administrator: Active (exp 8mo)        │
+│    Power BI Analyst: Active (exp 12mo)          │
+│    ⚠ AWS cert expiring in 6 months              │
+│    → Recommend renewal before deployment        │
+│                                                    │
+│  Career Alignment ................. 75/100 ✓    │
+│    Employee's Goal: "Sector Specialization"     │
+│    Preference: Healthcare sector ✓              │
+│    Learning Preference: Hands-on ✓              │
+│    → Good alignment with goals                   │
+│                                                    │
+│  Location Fit ..................... 95/100 ✓   │
+│    Opportunity: London or Remote                │
+│    Current Location: London                      │
+│    Mobility: Willing                             │
+│    Remote Work: Willing                          │
+│    → Excellent location fit                      │
+│                                                    │
+│  ────────────────────────────────────────────────  │
+│  RECOMMENDATION NARRATIVE                        │
+│  ────────────────────────────────────────────────  │
+│                                                    │
+│  STRENGTHS:                                      │
+│  ✓ Excellent technical skill match (92/100)     │
+│    All 4 required skills at strong proficiency  │
+│    levels, with Python expertise                │
+│  ✓ Direct healthcare sector experience          │
+│    5+ years in healthcare analytics work        │
+│  ✓ Seniority exact match                        │
+│    Senior level required, Senior available      │
+│  ✓ Good availability                            │
+│    40% capacity available, can start Feb        │
+│  ✓ Aligned with career goals                    │
+│    Seeking deeper healthcare specialization     │
+│                                                    │
+│  CONSIDERATIONS:                                 │
+│  ⚠ AWS certification expires in 6 months       │
+│    Recommend scheduling renewal before/during   │
+│    project to maintain compliance               │
+│  ⚠ Two-week gap before availability             │
+│    Project starts Feb 15, Jane free Feb 22      │
+│    May require interim coverage or date shift    │
+│                                                    │
+│  DEPLOYMENT READINESS: READY (with notes)      │
+│                                                    │
+│  RECOMMENDATION:                                 │
+│  Highly recommended. Jane is an excellent match │
+│  across all dimensions. She has all required    │
+│  skills at strong proficiency levels, direct    │
+│  healthcare experience, and is at the right     │
+│  career stage. Minor considerations: schedule   │
+│  AWS certification renewal and coordinate       │
+│  project start date with her availability.      │
+│                                                    │
+│  ────────────────────────────────────────────────  │
+│  [ALLOCATE JANE TO OPPORTUNITY] button          │
+│  (Allocate) button - Green, prominent           │
+│  ────────────────────────────────────────────────  │
+│                                                    │
+│  [Compare to Other Candidates] link              │
+│  [Export Recommendation] button                  │
+│  [Save to History] button                        │
+│                                                    │
+└────────────────────────────────────────────────────┘
+
+STEP 4: ALLOCATION
+─────────────────
+User clicks "Allocate" → System:
+  1. Updates employees.csv availability to "Allocated"
+  2. Updates opportunities.csv status to "Filled"
+  3. Creates project_history record for tracking
+  4. Shows success message
+  5. Returns to opportunity selector (Step 1)
+  6. Removes filled opportunity from future recommendations
+
+
+ALLOCATION.PY DETAILED SECTIONS
+──────────────────────────────────
+
+SECTION 1: CURRENT ALLOCATIONS
+┌────────────────────────────────────────────────────┐
+│  ACTIVE PROJECT ASSIGNMENTS                      │
+├────────────────────────────────────────────────────┤
+│                                                    │
+│ Sorted by: [End Date ▼] | Filter: [All ▼]       │
+│                                                    │
+│ # │ Employee      │ Opportunity │ Sector │ %  │    │
+│ ──┼───────────────┼─────────────┼────────┼────┼─── │
+│ 1 │ Jane Smith    │ Healthcare  │ Data.. │ 60 │ [✕] │
+│ 2 │ Robert Johnson│ Finance     │ Risk.. │ 80 │ [✕] │
+│ 3 │ Sarah Williams│ Transport   │ Optim..│ 50 │ [✕] │
+│ 4 │ Mike Chen     │ Government  │ Analyt│ 70 │ [✕] │
+│ ...                                              │
+│                                                    │
+│ [✕] = De-allocate button (free up capacity)     │
+│                                                    │
+└────────────────────────────────────────────────────┘
+
+SECTION 2: BENCH TRACKING
+┌────────────────────────────────────────────────────┐
+│  AVAILABLE WORKFORCE                             │
+│  (18 employees, 45% of workforce)                │
+├────────────────────────────────────────────────────┤
+│                                                    │
+│ # │ Employee      │ Available │ Ready Date │      │
+│ ──┼───────────────┼───────────┼────────────┼───── │
+│ 1 │ Alice Cooper  │ 100%      │ Today      │[Alloc]│
+│ 2 │ Bob Davis     │ 80%       │ Feb 1      │[Alloc]│
+│ 3 │ Carol Evans   │ 50%       │ Feb 15     │[Alloc]│
+│ ...                                              │
+│                                                    │
+│ [Alloc] = Quick allocate to opportunity         │
+│                                                    │
+└────────────────────────────────────────────────────┘
+
+SECTION 3: UPCOMING OPPORTUNITIES
+┌────────────────────────────────────────────────────┐
+│  OPEN OPPORTUNITIES (Unfilled)                   │
+├────────────────────────────────────────────────────┤
+│                                                    │
+│ # │ Opportunity   │ Skills Needed │ Days │        │
+│ ──┼───────────────┼───────────────┼──────┼─────── │
+│ 1 │ Healthcare    │ Python, SQL..│ 12   │[Recs]  │
+│ 2 │ Banking       │ Power BI, DAX│ 8    │[Recs]  │
+│ 3 │ Aviation      │ Azure, Sec...│ 25   │[Recs]  │
+│ ...                                              │
+│                                                    │
+│ [Recs] = View recommendations for opportunity   │
+│                                                    │
+└────────────────────────────────────────────────────┘
+
+SECTION 4: CAPACITY FORECAST
+┌────────────────────────────────────────────────────┐
+│  90-DAY UTILIZATION FORECAST                     │
+├────────────────────────────────────────────────────┤
+│                                                    │
+│ Utilization %                                    │
+│ 100% ┬────────                                    │
+│      │      ╱╲                                    │
+│  75% ┤    ╱  ╲                                    │
+│      │  ╱      ╲                                  │
+│  50% ┤╱         ╲─────────                        │
+│      │                 ╲                          │
+│  25% ┤                   ╲                        │
+│      │                    ╲────                   │
+│   0% └──────────────────────────→                │
+│     Now   30d   60d   90d                        │
+│                                                    │
+│ Interpretation:                                  │
+│ • Currently at 55% utilization                  │
+│ • 4 projects ending in next 30 days             │
+│ • Bench will increase to 65% available          │
+│ • 3 opportunities starting mid-Feb               │
+│ • Utilization rises back to 75%                 │
+│ • No over-allocation risk in forecast           │
+│                                                    │
+└────────────────────────────────────────────────────┘
+
+SECTION 5: SUMMARY & EXPORT
+├─ Total Workforce: 40
+├─ Currently Allocated: 14 (35%)
+├─ Available: 18 (45%)
+├─ Unconfirmed: 8 (20%)
+├─ [Export to Excel] button
+├─ [View Detailed Report] link
+└─ [Email to Stakeholders] option
+
+
+7. FUTURE ROADMAP AND EXTENSIBILITY
+================================================================================
+
+PHASE 2: ADVANCED ANALYTICS
+───────────────────────────
+
+Predictive Capabilities:
+  • Attrition risk modeling
+    ├─ Identify at-risk employees
+    ├─ Predict departures 6+ months out
+    ├─ Enable proactive retention
+    └─ Data: Engagement scores + project patterns
+
+  • Skills gap forecasting
+    ├─ Project future skills demand
+    ├─ Identify emerging capability gaps
+    ├─ Recommend hiring/development
+    └─ Data: Opportunities + sector trends
+
+  • Optimization models
+    ├─ Linear programming for allocation
+    ├─ Minimize deployment costs
+    ├─ Maximize team cohesion
+    ├─ Respect preferences and constraints
+    └─ Data: All allocation dimensions
+
+
+PHASE 3: PLATFORM INTELLIGENCE
+───────────────────────────────
+
+Conversational Interface:
+  • Chatbot for natural language queries
+    ├─ "Show me available senior Python developers"
+    ├─ "How many people can we deploy in banking?"
+    ├─ "Who should be learning Azure?"
+    └─ Intent parsing + query generation
+
+  • Workflow Automation
+    ├─ Auto-alert for certification expiry
+    ├─ Recommend certifications based on career goals
+    ├─ Auto-suggest development assignments
+    └─ Scheduled reports to stakeholders
+
+
+PHASE 4: ML INTEGRATION (when ready)
+──────────────────────────────────
+
+ML Models:
+  • Recommendation enhancement
+    ├─ Collaborative filtering (how similar past matches performed)
+    ├─ NLP on project descriptions for skill inference
+    ├─ Time-series forecasting of availability
+    └─ BUT: Still explainable, not black-box
+
+  • Performance prediction
+    ├─ Given a person + opportunity combo, predict success
+    ├─ Models trained on historical project outcomes
+    ├─ Used to refine scoring weights
+    └─ Transparent about uncertainty
+
+
+PHASE 5: ENTERPRISE INTEGRATION
+─────────────────────────────────
+
+System Connections:
+  • HR System Integration (Workday, SuccessFactors)
+    ├─ Auto-sync employee master data
+    ├─ Sync certification compliance data
+    ├─ Bi-directional allocation updates
+    ├─ Reduce manual data entry
+    └─ Single source of truth
+
+  • Calendar & Scheduling Integration
+    ├─ Connect to Outlook/Google Calendar
+    ├─ Auto-create calendar holds for allocations
+    ├─ Show available time slots
+    ├─ Prevent double-booking
+    └─ Data: Availability + project calendars
+
+  • Financial System Integration
+    ├─ Cost allocation and billing
+    ├─ Project budget vs. actual
+    ├─ Resource utilization ROI
+    ├─ Margin analysis by sector
+    └─ Data: Allocations + salary data
+
+  • Project Management Integration
+    ├─ Sync project statuses and timelines
+    ├─ Auto-update delivery tracking
+    ├─ Link recommendations to projects
+    ├─ Enable outcome feedback
+    └─ Data: Project performance records
+
+
+EXTENSIBILITY PATTERNS
+──────────────────────
+
+Pattern 1: NEW SCORING DIMENSION
+├─ Add score function to matching_engine.py
+├─ Update scoring formula with weight
+├─ Test against historical recommendations
+├─ Deploy without architecture changes
+└─ Example: Time zone compatibility score
+
+Pattern 2: NEW DATA SOURCE
+├─ Create new CSV in data/
+├─ Add loader to app.py
+├─ Update matching_engine.py if relevant
+├─ Add visualizations to dashboards if relevant
+└─ Example: Training_history.csv
+
+Pattern 3: NEW PAGE/WORKFLOW
+├─ Create new file in pages/
+├─ Add to sidebar navigation in app.py
+├─ Leverage existing matching_engine and data
+└─ Example: pages/skills_development.py
+
+Pattern 4: NEW RECOMMENDATION TYPE
+├─ Create new function in matching_engine.py
+├─ Different scoring logic for different use case
+├─ Reuse data infrastructure
+└─ Example: Team composition matching
+
+
+8. CODE QUALITY AND STANDARDS
+================================================================================
+
+PYTHON STYLE GUIDE
+───────────────────
+
+Follow PEP 8:
+  • 4-space indentation
+  • Line length max 88 characters
+  • Descriptive variable names (not x, y, z)
+  • Docstrings for all functions and classes
+  • Type hints for better IDE support
+
+Example Function:
+```python
+def score_skill_match(
+    employee_skills: list[dict],
+    required_skills: list[str]
+) -> int:
+    """
+    Calculate skill match score (0-100) for employee vs opportunity.
+    
+    Args:
+        employee_skills: List of {skill_name, proficiency_level}
+        required_skills: List of required skill names
+    
+    Returns:
+        Score 0-100 representing quality of skill match
+    
+    Score Calculation:
+        - 100% if all required skills available at strong proficiency
+        - Reduced by missing skills and weak proficiency
+        - Example: 3/4 skills with avg prof 85% = ~75 score
+    """
+    # Implementation here
+    pass
+```
+
+COMMENTING APPROACH
+──────────────────
+
+Comments explain WHY, not WHAT:
+✓ GOOD:   "Weight skill match higher because technical capabilities are the primary capability predictor"
+✗ BAD:    "Multiply skill_score by 0.30"
+
+Functions have docstrings:
+```python
+def recommend_candidates(opportunity_id: int) -> list[dict]:
+    """Generate ranked candidate recommendations for staffing opportunity."""
+```
+
+Complex sections have brief explanations:
+```python
+# Join employee skills with proficiency levels to normalize score
+# Example: "Expert" → 100, "Advanced" → 75, etc.
+proficiency_map = {"Expert": 100, "Advanced": 75, ...}
+```
+
+CODE ORGANIZATION
+──────────────────
+
+functions_to_features = {
+    "calculate_X_score": "Scoring dimension",
+    "rank_candidates": "Main matching algorithm",
+    "generate_explanation": "Recommendation transparency",
+    "flag_risks": "Risk identification",
+}
+
+Each function:
+  • Does one thing well
+  • Has clear inputs and outputs
+  • Documented with docstring
+  • Testable independently
+  • Returns normalized 0-100 scores
+
+
+9. TESTING AND VALIDATION
+================================================================================
+
+UNIT TESTS (Future)
+─────────────────
+
+Test structure:
+```
+tests/
+├── test_matching_engine.py
+│   ├── test_skill_score_all_match()  # All required skills available
+│   ├── test_skill_score_partial()    # Some skills missing
+│   ├── test_skill_score_missing()    # No matching skills
+│   ├── test_seniority_exact_match()
+│   ├── test_seniority_overqualified()
+│   └── test_seniority_underqualified()
+├── test_data_loading.py
+│   ├── test_employees_load()
+│   ├── test_referential_integrity()
+│   └── test_missing_values()
+└── test_ui.py
+    ├── test_dashboard_loads()
+    ├── test_recommendations_render()
+    └── test_allocation_workflow()
+```
+
+VALIDATION CHECKS
+──────────────────
+
+Data Validation:
+  ✓ CSV files parse without errors
+  ✓ Required columns present
+  ✓ Foreign key references valid
+  ✓ No duplicate primary keys
+  ✓ Scores always 0-100
+  ✓ Categorical values in allowed set
+
+Logic Validation:
+  ✓ Top-ranked candidate score > lower ranks
+  ✓ Scoring is consistent (same input = same output)
+  ✓ Explanations match score breakdown
+  ✓ Risk flags for real concerns (not false positives)
+
+User Acceptance Testing:
+  ✓ Can a hiring manager use this to fill a role?
+  ✓ Are recommendations credible and defensible?
+  ✓ Do explanations build confidence or confusion?
+  ✓ Would you override these recommendations often?
+
+
+10. DEPLOYMENT CONSIDERATIONS
+================================================================================
+
+LOCAL DEPLOYMENT
+─────────────────
+
+Requirements:
+  • Python 3.8+ installed
+  • Virtual environment (venv or conda)
+  • 50MB disk space (code + sample data)
+  • 4GB RAM sufficient
+  • No external API dependencies
+
+Steps:
+  1. Clone/download codebase
+  2. Create virtual environment
+  3. pip install -r requirements.txt
+  4. python scripts/generate_sample_data.py
+  5. streamlit run app.py
+  6. Opens in browser on localhost:8501
+
+CLOUD DEPLOYMENT (Future)
+──────────────────────────
+
+AWS Option:
+  • Containerize with Docker
+  • Deploy to ECS/EKS
+  • Use RDS for database (when needed)
+  • CloudFront for CDN
+  • Estimated cost: $100-500/month
+
+Azure Option:
+  • Deploy to App Service
+  • Use Cosmos DB for data (when needed)
+  • Azure Storage for data files
+  • Key Vault for secrets
+  • Estimated cost: $100-500/month
+
+GCP Option:
+  • Deploy to Cloud Run
+  • Use Firestore for data (when needed)
+  • Cloud Storage for CSVs
+  • Identity Platform for auth
+  • Estimated cost: Pay-per-use, typically $50-300/month
+
+
+SCALING ROADMAP
+─────────────────
+
+1000 Employees:
+  • CSV → Database migration (PostgreSQL)
+  • Caching layer (Redis) for dashboard queries
+  • Background job queue (Celery) for recommendations
+  • Multiple replicas for load balancing
+
+10,000 Employees:
+  • Recommendation engine parallelization
+  • Data warehouse (Snowflake) for analytics
+  • Real-time event streaming (Kafka)
+  • Advanced indexing and optimization
+
+100,000+ Employees:
+  • Distributed recommendation compute (Spark)
+  • Machine learning for scoring (TensorFlow)
+  • Advanced data governance (Collibra)
+  • Enterprise integration (API Gateway)
+
+
+SECURITY HARDENING (Future)
+─────────────────────────────
+
+  • Enterprise SSO/SAML integration
+  • Row-level security by department
+  • Field-level encryption for sensitive data
+  • Audit logging of all actions
+  • Data retention and purge policies
+  • GDPR/compliance reporting
+  • SOC 2 certification
+
+
+================================================================================
+This implementation creates a realistic, interview-quality FDE staffing
+intelligence platform that demonstrates:
+  • Structured, professional code
+  • Thoughtful system architecture
+  • Explainability and governance
+  • Business acumen (not just technical complexity)
+  • Enterprise thinking (scalability, extensibility)
+
+The result: A credible, production-ready prototype suitable for an interview
+case study demonstrating senior-level software engineering maturity.
+================================================================================

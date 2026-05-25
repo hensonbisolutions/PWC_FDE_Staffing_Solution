@@ -1,0 +1,41 @@
+employee_id,first_name,last_name,email,seniority_level,primary_sector,secondary_sector,location,years_experience,employment_status,join_date,manager_id
+1001,Danielle,Carter,michael34@example.org,Junior,Healthcare,Retail,Leeds,8,Active,2019-11-21,
+1002,Stephanie,Dobson,daviesbenjamin@example.net,Principal,Aviation,Energy,London,1,Active,2024-04-23,1001.0
+1003,Geoffrey,Robinson,tom67@example.org,Mid-Level,Healthcare,Banking,Cambridge,8,Active,2021-11-01,1002.0
+1004,Dale,Williams,zhawkins@example.org,Junior,Transport,Energy,Bristol,9,Active,2017-10-22,1001.0
+1005,Susan,Brown,gordonevans@example.org,Senior,Aviation,Aviation,Cambridge,4,Active,2019-09-13,1003.0
+1006,Barry,Moore,angelapatel@example.org,Principal,Retail,Healthcare,Oxford,18,Active,2016-06-25,1004.0
+1007,Hugh,Spencer,xevans@example.net,Junior,Retail,Government,Leeds,3,Active,2020-05-28,1001.0
+1008,Dean,Allen,millsanna@example.com,Senior,Aviation,Banking,Manchester,13,Active,2021-04-16,1005.0
+1009,Rachael,Dunn,rachael67@example.org,Senior,Transport,Government,Bristol,7,On Leave,2019-03-22,1002.0
+1010,Amanda,Mitchell,gwilson@example.net,Junior,Transport,Banking,Birmingham,15,Active,2016-09-21,1002.0
+1011,Natasha,O'Connor,goughhoward@example.com,Principal,Banking,Government,London,8,Active,2021-10-19,1003.0
+1012,Callum,Shaw,barryblake@example.com,Lead,Retail,Aviation,Leeds,19,On Leave,2021-10-18,1003.0
+1013,Jason,Morrison,sarahevans@example.com,Mid-Level,Insurance,Energy,Oxford,5,Active,2016-11-01,
+1014,Rachael,Lowe,mary74@example.org,Mid-Level,Retail,Energy,Cambridge,12,Active,2020-07-21,
+1015,Julian,Patterson,ajohnson@example.org,Principal,Insurance,Aviation,London,4,Active,2025-05-27,
+1016,Joanna,Webster,parkinsoncaroline@example.net,Lead,Aviation,Energy,Cambridge,20,Active,2020-02-08,1002.0
+1017,Georgia,Gill,ubrooks@example.org,Principal,Healthcare,Aviation,Edinburgh,11,Active,2018-04-10,1002.0
+1018,Frances,Thomas,brownmegan@example.com,Lead,Transport,Insurance,London,9,On Leave,2021-11-16,
+1019,Connor,Duffy,bethansavage@example.com,Principal,Aviation,Retail,Leeds,5,Active,2024-08-06,
+1020,Adrian,Goddard,awilliams@example.net,Principal,Healthcare,Government,Oxford,1,Active,2024-09-24,1003.0
+1021,Joanna,Gibson,fstanley@example.net,Senior,Banking,Healthcare,Leeds,19,Active,2024-11-30,
+1022,Jane,Harris,knightandrew@example.com,Lead,Aviation,Transport,Birmingham,16,On Leave,2024-07-15,
+1023,Amber,Dodd,helen35@example.org,Senior,Energy,Banking,Leeds,10,Active,2021-04-15,1003.0
+1024,Reece,Harvey,katy77@example.net,Lead,Insurance,Aviation,Leeds,8,Active,2019-04-20,1003.0
+1025,Liam,Lawrence,pricejoshua@example.net,Junior,Banking,Banking,London,3,On Leave,2019-07-05,
+1026,Stephen,Power,pmitchell@example.org,Mid-Level,Aviation,Healthcare,Bristol,3,On Leave,2020-12-07,1001.0
+1027,Philip,Barker,chelseamorgan@example.net,Senior,Insurance,Banking,Birmingham,19,On Leave,2021-04-15,1005.0
+1028,Terence,Singh,joanna59@example.org,Mid-Level,Insurance,Energy,Leeds,4,Active,2018-01-20,1004.0
+1029,Helen,Davies,adrianclark@example.net,Senior,Energy,Energy,Oxford,2,On Leave,2017-12-23,
+1030,Steven,Cunningham,iwilliams@example.net,Junior,Energy,Government,Manchester,8,Active,2024-12-07,1001.0
+1031,Bernard,Dale,gerald90@example.com,Principal,Insurance,Transport,Cambridge,6,Active,2025-07-01,1005.0
+1032,Sheila,O'Connor,fread@example.net,Mid-Level,Aviation,Insurance,Manchester,2,On Leave,2021-12-20,
+1033,Aaron,Williams,francescaschofield@example.org,Junior,Banking,Transport,Cambridge,16,Active,2021-08-24,1001.0
+1034,Sharon,O'Brien,fiona82@example.org,Lead,Healthcare,Transport,Cambridge,1,Active,2024-11-22,1002.0
+1035,Gerard,Gregory,melissa38@example.org,Lead,Retail,Energy,Oxford,5,Active,2022-05-16,1002.0
+1036,Valerie,Rowe,bakerelizabeth@example.net,Mid-Level,Healthcare,Healthcare,Bristol,2,Active,2023-01-31,1005.0
+1037,Charlie,Walton,uhall@example.net,Principal,Transport,Healthcare,Manchester,6,Active,2018-03-14,
+1038,Laura,Mitchell,youngkirsty@example.org,Mid-Level,Energy,Aviation,Leeds,19,On Leave,2019-04-15,
+1039,Iain,Kelly,jordanreid@example.com,Principal,Aviation,Energy,Bristol,9,Active,2021-02-02,1003.0
+1040,George,Webster,ryanpage@example.com,Mid-Level,Retail,Energy,Birmingham,10,Active,2024-09-06,1003.0

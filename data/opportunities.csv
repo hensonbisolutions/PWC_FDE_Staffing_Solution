@@ -1,0 +1,16 @@
+opportunity_id,opportunity_name,client_sector,location,required_seniority,required_skills,allocation_weeks,start_date,status,priority,description
+2001,Minus incidunt nesciunt ipsa.,Government,Birmingham,Senior,"Azure, Python, Machine Learning",32,2026-06-10,Filled,High,Praesentium officia ut voluptate nostrum cum veniam quae eligendi.
+2002,Consectetur cumque quibusdam adipisci doloremque.,Insurance,Remote,Mid-Level,"Data Engineering, Stakeholder Management, Analytics, DAX",29,2026-06-09,In Progress,Low,Reprehenderit ut unde totam.
+2003,Voluptate ea occaecati molestiae.,Energy,Remote,Mid-Level,"Data Engineering, Machine Learning, Azure",40,2026-06-01,Open,Medium,Ducimus temporibus voluptas amet ipsum rem deserunt expedita.
+2004,Quia optio reprehenderit consequatur facilis.,Energy,Birmingham,Mid-Level,"Analytics, DAX, Automation, Azure, SQL",44,2026-06-08,Open,Critical,Corrupti consequatur porro recusandae vitae eveniet.
+2005,Perferendis delectus.,Energy,London,Senior,"Analytics, Machine Learning, Data Visualisation",42,2026-06-19,Filled,Low,Corporis fuga eum rerum repudiandae error deleniti voluptas minus.
+2006,Nisi quibusdam eligendi a culpa.,Aviation,London,Mid-Level,"Data Visualisation, Data Engineering",46,2026-07-01,In Progress,High,Aliquam repellendus praesentium labore suscipit.
+2007,Consectetur quod.,Energy,Remote,Senior,"Stakeholder Management, AI/ML",10,2026-05-20,Open,Critical,Iusto facere facilis sunt rem tempore quasi est consequuntur perspiciatis.
+2008,Perferendis incidunt asperiores dolorum.,Banking,Birmingham,Senior,"ETL, Analytics, Cloud Engineering",29,2026-06-18,Open,Critical,Quisquam sunt temporibus perferendis in velit nulla quis id.
+2009,Quia natus in corporis.,Retail,Birmingham,Mid-Level,"Automation, SQL",11,2026-07-12,Open,Critical,Libero vel pariatur earum ullam aliquam.
+2010,Dolorem iure asperiores.,Insurance,Remote,Senior,"Data Engineering, Automation, Data Visualisation, DAX",10,2026-06-17,Filled,Critical,Molestiae asperiores quasi debitis doloremque neque sunt natus libero.
+2011,Unde quod quam consequatur.,Aviation,London,Senior,"Azure, Python",45,2026-05-26,Open,High,Vitae eaque saepe sit voluptatum fuga earum doloribus similique.
+2012,Minus optio voluptate cupiditate.,Energy,Birmingham,Mid-Level,"ETL, Power BI, Data Engineering",29,2026-06-29,Open,High,Porro eos voluptate libero dolorum voluptatum.
+2013,Necessitatibus asperiores.,Insurance,Birmingham,Senior,"Machine Learning, Python, Analytics, Stakeholder Management, DAX",4,2026-07-04,Open,High,Aspernatur a provident repellat et.
+2014,Ea unde repudiandae a.,Aviation,Manchester,Senior,"Data Visualisation, Analytics, Cloud Engineering, SQL",24,2026-06-01,Filled,Medium,Porro voluptates voluptatem ea esse nemo rerum consequatur eum voluptatibus.
+2015,Libero numquam aperiam deleniti.,Government,Birmingham,Lead,"AI/ML, VBA, Automation, ETL",29,2026-06-26,Open,Critical,Porro accusamus perferendis molestiae alias neque pariatur modi repellendus aspernatur.

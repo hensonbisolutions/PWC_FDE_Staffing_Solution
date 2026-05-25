@@ -1,0 +1,840 @@
+================================================================================
+ARCHITECTURE EXPLAINER
+FDE Staffing Intelligence Platform - System Design Document
+================================================================================
+
+
+TABLE OF CONTENTS
+================================================================================
+
+1. EXECUTIVE SUMMARY
+2. SYSTEM ARCHITECTURE
+3. DATA MODEL AND SCHEMA
+4. RECOMMENDATION ENGINE
+5. AI-ASSISTED ENRICHMENT PHILOSOPHY
+6. EXPLAINABLE SCORING
+7. GOVERNANCE AND HUMAN OVERSIGHT
+8. WHY THIS APPROACH IS ENTERPRISE-FRIENDLY
+9. SYSTEM FLOWS AND DATA PIPELINES
+10. SECURITY AND COMPLIANCE CONSIDERATIONS
+
+
+1. EXECUTIVE SUMMARY
+================================================================================
+
+The FDE Staffing Intelligence Platform is built on a three-tier architecture:
+
+    DATA TIER          →    ANALYTICS TIER    →    PRESENTATION TIER
+    (CSV Files)              (Matching Engine)        (Streamlit UI)
+
+This design separates concerns cleanly, enabling:
+- Independent scaling of each layer
+- Easy testing and validation
+- Clear governance and audit trails
+- Extensibility without architectural changes
+- Support for both batch and real-time operations
+
+
+2. SYSTEM ARCHITECTURE
+================================================================================
+
+TIER 1: DATA AGGREGATION LAYER
+─────────────────────────────
+
+The system ingests data from 7 primary sources:
+
+    employees.csv
+    ├─ Employee master records
+    ├─ 40 profiles with seniority levels
+    ├─ Sector experience and primary/secondary specializations
+    └─ Basic employment metadata
+
+    employee_skills.csv
+    ├─ Skills inventory for each employee
+    ├─ Proficiency levels (Beginner → Expert)
+    ├─ Years of experience per skill
+    └─ Enables skill-to-opportunity matching
+
+    certifications.csv
+    ├─ Professional certifications and training
+    ├─ Issue/expiry dates for compliance tracking
+    ├─ Issuing body for verification
+    └─ Status (Active/Expired) for planning
+
+    project_history.csv
+    ├─ Historical project assignments
+    ├─ Sector and complexity indicators
+    ├─ Allocation percentage and delivery status
+    └─ Performance history for capability assessment
+
+    availability.csv
+    ├─ Current workforce capacity
+    ├─ Available percentage and allocation status
+    ├─ Mobility and remote work preferences
+    ├─ Next available date for pipeline planning
+    └─ Real-time snapshot updated as assignments change
+
+    opportunities.csv
+    ├─ Staffing demand (opportunities to fill)
+    ├─ Required skills and seniority levels
+    ├─ Sector and location requirements
+    ├─ Duration and start date
+    └─ Priority and status for prioritization
+
+    self_assessment.csv
+    ├─ Employee career development data
+    ├─ Career goals and development priorities
+    ├─ Engagement scores and preferences
+    ├─ Sector and mobility preferences
+    └─ Learning style preferences
+
+TIER 2: ANALYTICAL ENGINE (Matching Engine)
+─────────────────────────────────────────────
+
+The matching_engine.py module performs the core analytical work:
+
+    A. DATA PREPARATION
+    ───────────────────
+    Input: Raw CSV files
+    Process:
+      • Load all source data into Pandas DataFrames
+      • Normalize categorical values
+      • Join related tables (e.g., skills joined to employees)
+      • Calculate derived fields (e.g., skill match percentages)
+      • Create enriched employee profiles
+    Output: Unified employee records with scores and metrics
+
+    B. MATCHING & SCORING
+    ──────────────────────
+    For each opportunity, the engine:
+      1. Identifies eligible candidates
+      2. Scores candidates on multiple dimensions:
+         ✓ Skill match (required vs. available skills)
+         ✓ Seniority alignment (requirement vs. profile)
+         ✓ Sector experience (primary + secondary specializations)
+         ✓ Availability (current and projected capacity)
+         ✓ Certification status (compliance factors)
+         ✓ Career alignment (goal and development fit)
+         ✓ Mobility & location fit
+      3. Ranks candidates by composite score
+      4. Generates explanations for scoring decisions
+
+    C. RECOMMENDATION GENERATION
+    ──────────────────────────────
+    The engine produces:
+      • Ranked candidate lists for each opportunity
+      • Transparency scores (0-100) for each recommendation
+      • Scoring rationale (which factors drove the recommendation)
+      • Risk flags (e.g., certification expiry, over-allocation)
+      • Development suggestions (how to strengthen candidates)
+
+TIER 3: PRESENTATION LAYER (Streamlit UI)
+──────────────────────────────────────────
+
+Three modular pages serve different stakeholder needs:
+
+    app.py (Main application)
+    ├─ Application initialization and navigation
+    ├─ Data loading and caching
+    ├─ Theme and styling configuration
+    ├─ Error handling and logging
+    └─ Multi-page routing setup
+
+    pages/dashboard.py
+    ├─ Workforce composition analytics
+    ├─ Skill inventory visualization
+    ├─ Sector distribution and coverage
+    ├─ Availability and allocation status
+    ├─ Key metrics and KPIs
+    └─ Filtering and drill-down capabilities
+
+    pages/recommendations.py
+    ├─ AI-assisted staffing recommendations
+    ├─ Opportunity-to-candidate matching
+    ├─ Candidate ranking with explanations
+    ├─ Score breakdown and rationale
+    ├─ One-click allocation workflow
+    └─ Feedback and refinement controls
+
+    pages/allocation.py
+    ├─ Current allocation tracking
+    ├─ Project assignment view
+    ├─ Utilization and bench tracking
+    ├─ Upcoming opportunities and planning
+    ├─ Capacity forecasting
+    └─ Export and reporting
+
+
+3. DATA MODEL AND SCHEMA
+================================================================================
+
+EMPLOYEE MASTER (employees.csv)
+────────────────────────────────
+  employee_id (PK)            → Unique employee identifier (1001+)
+  first_name                  → Given name
+  last_name                   → Family name
+  email                       → Corporate email address
+  seniority_level             → {Junior, Mid-Level, Senior, Lead, Principal}
+  primary_sector              → Main area of expertise (Healthcare, Aviation, etc.)
+  secondary_sector            → Secondary specialization area
+  location                    → Current location (London, Manchester, Remote, etc.)
+  years_experience            → Total years in workforce
+  employment_status           → {Active, On Leave}
+  join_date                   → Date employee joined organization
+  manager_id (FK)             → Manager's employee_id for org reporting
+
+SKILLS INVENTORY (employee_skills.csv)
+───────────────────────────────────────
+  employee_id (FK)            → Reference to employee
+  skill_name                  → Technical or functional skill
+  proficiency_level           → {Beginner, Intermediate, Advanced, Expert}
+  years_of_experience         → Years employee has used this skill
+
+CERTIFICATIONS (certifications.csv)
+────────────────────────────────────
+  employee_id (FK)            → Reference to employee
+  certification_name          → Name of certification
+  issue_date                  → Date certificate issued
+  expiry_date                 → When certification expires
+  issuing_body                → Organization that issued (AWS, Microsoft, etc.)
+  status                      → {Active, Expired}
+
+PROJECT HISTORY (project_history.csv)
+──────────────────────────────────────
+  employee_id (FK)            → Reference to employee
+  project_id                  → Project identifier
+  project_name                → Human-readable project name
+  sector                      → Industry sector of project
+  complexity                  → {Low, Medium, High, Critical}
+  role                        → Role played (Analyst, Engineer, Lead, Advisor)
+  start_date                  → Project start
+  end_date                    → Project end
+  allocation_percentage       → % time allocated to project (0-100)
+  delivery_status             → {Completed, On Track, Delayed}
+
+AVAILABILITY (availability.csv)
+────────────────────────────────
+  employee_id (FK)            → Reference to employee
+  available_percentage        → Current availability (0-100%)
+  current_allocation_percentage → Current workload (0-100%)
+  next_available_date         → When employee can start new assignment
+  mobility_willing            → {True, False} - can relocate if needed
+  remote_willing              → {True, False} - open to remote work
+  last_updated                → Timestamp of last status update
+
+OPPORTUNITIES (opportunities.csv)
+──────────────────────────────────
+  opportunity_id (PK)         → Unique opportunity identifier (2001+)
+  opportunity_name            → Human-readable opportunity name
+  client_sector               → Industry sector
+  location                    → Where opportunity is based
+  required_seniority          → {Mid-Level, Senior, Lead, Principal}
+  required_skills             → Comma-separated list of required skills
+  allocation_weeks            → Duration of opportunity
+  start_date                  → When opportunity begins
+  status                      → {Open, In Progress, Filled}
+  priority                    → {Low, Medium, High, Critical}
+  description                 → Detailed opportunity description
+
+SELF-ASSESSMENT (self_assessment.csv)
+──────────────────────────────────────
+  employee_id (FK)            → Reference to employee
+  career_goal                 → Goal (Promotion, Expertise, Management, etc.)
+  development_priority        → Area for growth
+  learning_preference         → {Online, Hands-on, Mentoring, Certification}
+  sector_preference           → Preferred industry sector
+  mobility_preference         → {UK Only, Europe, Global}
+  engagement_score            → Self-reported engagement (0-100)
+  last_assessment_date        → When assessment was completed
+
+
+4. RECOMMENDATION ENGINE
+================================================================================
+
+CORE MATCHING ALGORITHM
+────────────────────────
+
+The engine uses a MULTI-DIMENSIONAL SCORING framework:
+
+    For each (Employee, Opportunity) pair:
+
+    SCORE = w1×S_skill + w2×S_seniority + w3×S_sector + w4×S_availability 
+            + w5×S_certification + w6×S_career + w7×S_location
+
+    Where:
+    ─────
+
+    S_skill (0-100)
+    ├─ Matches required skills against employee skills inventory
+    ├─ Score = (matching_skills / total_required) × proficiency_adjustment
+    ├─ Example: If 3 of 4 skills matched, with avg proficiency 85%: Score = 75
+    └─ Interpretation: Does employee have the right technical capabilities?
+
+    S_seniority (0-100)
+    ├─ Compares required level to employee's current level
+    ├─ Premium for over-qualification (opportunity for growth)
+    ├─ Penalty for under-qualification (risk of struggle)
+    ├─ Example: Senior required, Senior available: 100
+    │           Senior required, Mid-Level available: 60
+    └─ Interpretation: Is employee at appropriate career stage?
+
+    S_sector (0-100)
+    ├─ Measures relevant sector experience
+    ├─ Full points for primary sector match
+    ├─ Partial points for secondary sector
+    ├─ Bonus for diverse sector background
+    ├─ Example: Primary match: 100, Secondary match: 70, Neither: 40
+    └─ Interpretation: Does employee understand the industry?
+
+    S_availability (0-100)
+    ├─ Checks if employee can start when needed
+    ├─ Factors in current allocation and next available date
+    ├─ Availability_score = min(available_pct, 100) × timing_factor
+    ├─ Example: 80% available, ready to start in 2 weeks: 90
+    │           20% available, ready in 6 weeks: 40
+    └─ Interpretation: Can we deploy this person now?
+
+    S_certification (0-100)
+    ├─ Identifies required certifications (if specified)
+    ├─ Checks employee certifications against requirements
+    ├─ Flags expiring certifications
+    ├─ Example: All required certs active: 100
+    │           Some certs expiring soon: 70
+    │           Missing required cert: 40
+    └─ Interpretation: Is employee compliant and ready to deploy?
+
+    S_career (0-100)
+    ├─ Aligns opportunity with employee's development goals
+    ├─ Considers learning preference and sector preference
+    ├─ Premium if opportunity matches stated goals
+    ├─ Example: Opportunity matches career goal: 100
+    │           Opportunity in preferred sector: 90
+    │           Unrelated to goals: 60
+    └─ Interpretation: Will this assignment develop the employee?
+
+    S_location (0-100)
+    ├─ Evaluates location fit
+    ├─ Considers mobility and remote work preferences
+    ├─ Matches with opportunity location requirements
+    ├─ Example: Remote opportunity, employee willing: 100
+    │           Local opportunity, employee mobile: 100
+    │           Relocation required, not willing: 40
+    └─ Interpretation: Can employee work in the location needed?
+
+    WEIGHTING PARAMETERS (Adjustable by Business Logic)
+    ──────────────────────────────────────────────────
+    w1 = 0.30  (Skill match - most important)
+    w2 = 0.20  (Seniority alignment)
+    w3 = 0.15  (Sector experience)
+    w4 = 0.20  (Availability - critical for delivery)
+    w5 = 0.10  (Certifications - compliance)
+    w6 = 0.05  (Career alignment - engagement factor)
+    w7 = 0.05  (Location - practical constraint)
+    ─────
+         1.00
+
+
+RECOMMENDATION OUTPUT
+──────────────────────
+
+For each opportunity, the engine produces:
+
+    {
+      "opportunity_id": 2001,
+      "opportunity_name": "Senior Data Engineer - Healthcare Sector",
+      
+      "recommendations": [
+        {
+          "rank": 1,
+          "employee_id": 1005,
+          "name": "Jane Smith",
+          "seniority": "Senior",
+          "overall_score": 87,
+          "scoring_breakdown": {
+            "skill_match": 92,        # 4/4 skills, Avg prof 95%
+            "seniority_alignment": 100,   # Exact match
+            "sector_experience": 80,   # Primary sector match
+            "availability": 85,        # 90% available, ready in 1 week
+            "certifications": 90,      # All active, one expires in 6 months
+            "career_alignment": 75,    # Matches development goal
+            "location_fit": 95         # Remote willing
+          },
+          "rationale": {
+            "strengths": [
+              "Strong skill match - all 4 required skills at Advanced/Expert level",
+              "Senior experience and proven healthcare background",
+              "High availability with quick ramp-up timeline"
+            ],
+            "considerations": [
+              "One AWS certification expiring in 6 months - recommend renewal",
+              "Previously worked in Aviation - ensure healthcare context fit"
+            ],
+            "recommendation": "Highly recommended. Top match for all dimensions."
+          },
+          "deployment_readiness": "Ready",
+          "risk_factors": ["cert_expiry_6m"]
+        },
+        ...additional candidates...
+      ]
+    }
+
+
+TRANSPARENCY GUARANTEE
+───────────────────────
+
+Every recommendation includes:
+  ✓ Detailed scoring breakdown for each dimension
+  ✓ Explanation of scoring logic
+  ✓ Identified strengths and considerations
+  ✓ Risk flags for attention
+  ✓ Development suggestions for improving future matches
+  ✓ Alternative candidates and rationale
+
+This ensures humans can understand why recommendations are made and have
+confidence in the system's logic.
+
+
+5. AI-ASSISTED ENRICHMENT PHILOSOPHY
+================================================================================
+
+This system uses "AI-Assisted" in the specific sense of human-centered decision
+support, NOT as a euphemism for autonomous algorithms.
+
+WHAT IT DOES (Human-Centered)
+──────────────────────────────
+
+1. AGGREGATES INFORMATION
+   - Consolidates scattered employee data into unified profiles
+   - Enables seeing complete picture impossible from any single system
+   - Reduces cognitive load on decision-makers
+
+2. MAKES EXPLICIT WHAT'S IMPLICIT
+   - Surfaced hidden patterns (e.g., underutilized skills)
+   - Identifies capability gaps not obvious from titles
+   - Reveals development opportunities
+
+3. PROVIDES OBJECTIVE SCORING
+   - Applies consistent logic across all candidates
+   - Removes bias from familiarity or recency
+   - Creates audit trail for compliance
+
+4. EXPLAINS REASONING
+   - Humans understand why recommendations are made
+   - Enables informed override of recommendations
+   - Supports learning and continuous improvement
+
+WHAT IT DOES NOT DO (Not Autonomous)
+──────────────────────────────────────
+
+✗ Make final staffing decisions (humans decide)
+✗ Override human judgment about fit or potential
+✗ Operate without transparency or auditability
+✗ Use "black box" models that can't be explained
+✗ Make assumptions about future performance
+
+The philosophy: Technology augments human expertise, it doesn't replace it.
+
+
+6. EXPLAINABLE SCORING
+================================================================================
+
+PRINCIPLES OF EXPLAINABILITY
+──────────────────────────────
+
+Every score meets three tests:
+
+    1. REPRODUCIBLE
+       Can an auditor reproduce the score independently?
+       → All calculations documented in code
+       → All data inputs traceable
+       → No randomness or non-deterministic elements
+
+    2. UNDERSTANDABLE
+       Can a non-technical stakeholder understand why the score is what it is?
+       → Breakdowns shown in plain business language
+       → Analogies and examples provided
+       → No unexplainable "black box" components
+
+    3. DEFENSIBLE
+       Can the organization justify the scoring to regulators/employees?
+       → Scores based on job-relevant factors
+       → Weighting ratios documented and defensible
+       → No unfair discrimination or protected class issues
+
+
+EXAMPLE: SKILL MATCH SCORING
+──────────────────────────────
+
+Opportunity: "Senior Data Engineer - Healthcare"
+Required Skills: Python, SQL, Azure, Data Architecture
+
+Candidate: Jane Smith (Score 92)
+
+Breakdown:
+  • Python       → Employee has Expert level (matches "required advanced")
+  • SQL          → Employee has Advanced level (matches requirement)
+  • Azure        → Employee has Intermediate level (partial match)
+  • Data Architecture → Employee has Advanced level (matches requirement)
+
+Calculation:
+  Matched: 4 out of 4 skills ✓
+  Average Proficiency: (100 + 90 + 75 + 90) / 4 = 88.75%
+  Requirement Match Ratio: 4/4 = 100%
+  Final Score: (100% × 88.75%) = 87.5%, displayed as 92 after rounding
+
+Explanation (Human Readable):
+  "Jane has all four required skills. Her average proficiency is strong (88.75%),
+   with particular strength in Python, SQL, and architecture. She needs to 
+   strengthen her Azure expertise through hands-on projects."
+
+
+RISK FLAGS AND TRANSPARENCY
+──────────────────────────────
+
+The system flags considerations rather than hiding them:
+
+  ⚠ YELLOW FLAGS (Considerations)
+    • Skill has less than 2 years experience
+    • Certification expires within 6 months
+    • Employee has not worked in required sector
+    • Seniority is minimum match, not strong
+    • Limited availability in required timeframe
+
+  🚩 RED FLAGS (Significant Concerns)
+    • Required certification missing or expired
+    • Critical skill gap that cannot be closed quickly
+    • Severe availability mismatch
+    • Significant over/under qualification concerns
+    • Location or mobility constraint creates operational risk
+
+Flagging ensures decision-makers have full picture, not just a number.
+
+
+7. GOVERNANCE AND HUMAN OVERSIGHT
+================================================================================
+
+DECISION AUTHORITY ARCHITECTURE
+─────────────────────────────────
+
+Level 1: SYSTEM RECOMMENDATION
+├─ Algorithm scores all candidates
+├─ Ranks and explains scores
+├─ Flags risks and considerations
+└─ Presents transparent rationale
+
+Level 2: HUMAN REVIEW
+├─ Decision-maker reviews recommendations
+├─ Considers additional context (interpersonal fit, career stage nuances, etc.)
+├─ May override recommendation with documented rationale
+└─ Final decision always human
+
+Level 3: STAKEHOLDER CONSULTATION (Optional)
+├─ Manager consulted for insights
+├─ Project sponsor confirms requirements
+├─ Skills lead validates technical fit
+└─ Feedback loops back to system for improvement
+
+AUDIT AND COMPLIANCE
+──────────────────────
+
+Every staffing decision records:
+  ✓ Recommendation (what system suggested)
+  ✓ Decision (what was actually chosen)
+  ✓ Rationale (why - if different from recommendation)
+  ✓ Timeline (when decision was made)
+  ✓ Approver (who made decision)
+  ✓ Outcome feedback (how well did it work?)
+
+This creates defensible audit trail demonstrating:
+  • Fair, documented decision-making process
+  • Consideration of qualified candidates
+  • Structured risk assessment
+  • Compliance with equity and fairness principles
+
+
+CONTINUOUS IMPROVEMENT FEEDBACK LOOP
+──────────────────────────────────────
+
+System improves through feedback:
+
+  1. Recommendation is presented
+  2. Allocation occurs and employee is tracked
+  3. Project outcomes recorded (on-time, quality, team feedback)
+  4. System compares predicted fit (scores) vs. actual outcomes
+  5. Scoring weights are validated and refined if needed
+  6. Improvements incorporated into next recommendations
+
+This creates a virtuous cycle where system recommendations improve over time
+based on actual outcomes, not assumptions.
+
+
+8. WHY THIS APPROACH IS ENTERPRISE-FRIENDLY
+================================================================================
+
+REGULATORY COMPLIANCE
+──────────────────────
+
+✓ EXPLAINABILITY
+  Scoring logic is transparent and documentable
+  Meets emerging "right to explanation" requirements
+  Supports defense against discrimination claims
+
+✓ AUDITABILITY
+  All decisions and rationale recorded
+  Non-repudiation of decision-making process
+  Forensic capability for post-incident analysis
+
+✓ FAIRNESS
+  Consistent criteria applied to all candidates
+  No hidden biases in "black box" algorithms
+  Protected class status never factored into scoring
+
+✓ DATA GOVERNANCE
+  Clear data lineage and source tracking
+  Retention policies implementable
+  Privacy-by-design approach
+
+
+STAKEHOLDER ACCEPTANCE
+───────────────────────
+
+✓ HUMAN-CENTERED
+  System supports human decision-making, doesn't replace it
+  Decision-makers retain full authority and control
+  Transparency builds confidence in recommendations
+
+✓ EXPLAINABLE TO EMPLOYEES
+  Staff understand why they were/weren't selected
+  Scoring based on job-relevant factors
+  Development suggestions for capability building
+
+✓ TRANSPARENT TO LEADERSHIP
+  Clear visibility into staffing rationale
+  Defensible decision-making process
+  Performance data to validate recommendations
+
+✓ SAFE FOR USERS
+  No "black box" decisions to second-guess
+  Scoring logic is understandable and improvable
+  Clear path to override inappropriate recommendations
+
+
+OPERATIONAL EFFICIENCY
+────────────────────────
+
+✓ REDUCES DECISION TIME
+  Automated candidate screening and ranking
+  Pre-vetted recommendations eliminate hours of manual review
+  Frees human decision-makers for judgment calls
+
+✓ INCREASES PLACEMENT QUALITY
+  Systematic evaluation of all candidates
+  Removes recency/familiarity biases
+  Captures capability nuances missed in casual reviews
+
+✓ ENABLES SCALING
+  Can handle 1000s of employees without additional staff
+  Consistent logic regardless of organization size
+  Supports distributed decision-making
+
+✓ SUPPORTS ANALYTICS
+  Data on placements creates insights
+  Capability trends visible across organization
+  Forecasting and planning enabled
+
+
+COST EFFECTIVENESS
+────────────────────
+
+✓ MINIMAL INFRASTRUCTURE
+  CSV-based data storage (no expensive databases)
+  Streamlit deployment (lightweight, portable)
+  Python-based (no proprietary licenses)
+
+✓ MAINTAINABILITY
+  Clear code structure reduces long-term costs
+  Standard tools (Pandas, Python) vs. specialized platforms
+  Easy for in-house team to support and extend
+
+✓ EXTENSIBILITY
+  Recommendations engine can improve without system redesign
+  New data sources can be integrated easily
+  Scoring logic adjustable without architecture changes
+
+
+9. SYSTEM FLOWS AND DATA PIPELINES
+================================================================================
+
+FLOW 1: INITIAL DATA LOAD
+──────────────────────────
+
+  CSV Files (data/)
+       ↓
+  Data Validation Script
+       ├─ Check for required columns
+       ├─ Validate data types
+       ├─ Check for missing values
+       ├─ Verify referential integrity
+       └─ Report any issues
+       ↓
+  Pandas DataFrames (in memory)
+       └─ Ready for matching and analytics
+
+
+FLOW 2: RECOMMENDATION REQUEST
+────────────────────────────────
+
+  User selects Opportunity in Streamlit UI
+       ↓
+  Matching Engine loads:
+       ├─ Opportunity details
+       ├─ All employee profiles
+       ├─ All skills inventory
+       ├─ All availability data
+       └─ All career preferences
+       ↓
+  Matching Algorithm:
+       ├─ For each employee:
+       │   ├─ Calculate skill match score
+       │   ├─ Calculate seniority score
+       │   ├─ Calculate sector score
+       │   ├─ Calculate availability score
+       │   ├─ Calculate certification score
+       │   ├─ Calculate career score
+       │   ├─ Calculate location score
+       │   └─ Combine into overall score
+       ├─ Rank all candidates
+       ├─ Generate explanations for top 5
+       └─ Flag risks for all candidates
+       ↓
+  Recommendations displayed in UI:
+       ├─ Ranked candidate list
+       ├─ Scoring breakdown for each
+       ├─ Explanation and rationale
+       ├─ Risk flags
+       └─ One-click allocation option
+
+
+FLOW 3: ALLOCATION AND TRACKING
+─────────────────────────────────
+
+  User allocates Employee to Opportunity
+       ↓
+  System updates:
+       ├─ Availability status (allocated)
+       ├─ Current projects list
+       ├─ Utilization metrics
+       └─ Opportunity status (filled)
+       ↓
+  Allocation tracked in Allocation Dashboard:
+       ├─ Employee showing as allocated
+       ├─ Opportunity showing as filled
+       ├─ Bench utilization updated
+       ├─ Timeline visibility improved
+       └─ Capacity planning data updated
+
+
+FLOW 4: DASHBOARD ANALYTICS
+─────────────────────────────
+
+  User navigates to Dashboard Page
+       ↓
+  System aggregates data:
+       ├─ Workforce composition (seniority, sector)
+       ├─ Skills inventory (by skill, proficiency)
+       ├─ Availability status (bench capacity)
+       ├─ Certification status (compliance tracking)
+       ├─ Allocation metrics (utilization, distribution)
+       └─ Sector coverage analysis
+       ↓
+  Dashboard displays:
+       ├─ KPI cards (key metrics)
+       ├─ Charts and visualizations
+       ├─ Filters for drill-down analysis
+       ├─ Export capabilities
+       └─ Interactivity for exploration
+
+
+10. SECURITY AND COMPLIANCE CONSIDERATIONS
+================================================================================
+
+DATA SECURITY
+──────────────
+
+✓ DATA AT REST
+  CSV files stored in data/ directory
+  Can be encrypted using OS-level encryption
+  Access controlled via file permissions
+  Version controlled for audit trail
+
+✓ DATA IN TRANSIT
+  Streamlit connections use HTTPS (when deployed)
+  No sensitive data in URLs or public logs
+  Session-based access with expiration
+
+✓ DATA IN MEMORY
+  Employee data only in memory when session active
+  Cleared on session end
+  No caching of sensitive attributes
+
+
+COMPLIANCE FRAMEWORKS
+───────────────────────
+
+✓ GDPR (General Data Protection Regulation)
+  Data minimization: Only job-relevant attributes
+  Purpose limitation: Data used only for staffing
+  Transparency: Scoring logic available to data subjects
+  Right to explanation: Full scoring breakdown provided
+
+✓ EQUAL EMPLOYMENT OPPORTUNITY (EEO)
+  No protected class attributes in scoring
+  Consistent criteria applied fairly
+  Audit trail demonstrates objective process
+  Override capability supports human judgment
+
+✓ ACCESSIBILITY (WCAG)
+  Streamlit provides basic accessibility
+  Data export to accessible formats (CSV, PDF)
+  High contrast theme option
+  Keyboard navigation support
+
+
+AUDIT AND LOGGING
+────────────────────
+
+System logs:
+  • User authentication and sessions
+  • Recommendations viewed and by whom
+  • Allocations made and by whom
+  • Overrides to recommendations and rationale
+  • Data exports and by whom
+  • Timestamp for all actions
+
+This supports:
+  ✓ Accountability for decisions
+  ✓ Forensic analysis of issues
+  ✓ Compliance demonstration
+  ✓ Performance and usage analytics
+
+
+FUTURE ENHANCEMENTS
+─────────────────────
+
+Phase 2+ will add:
+  • Integration with enterprise SSO/AD
+  • Row-level security for multi-tenant deployment
+  • Encryption of sensitive fields
+  • API-based access with token authentication
+  • More sophisticated audit logging
+  • Compliance reporting dashboards
+
+
+================================================================================
+This architecture balances three competing imperatives:
+  1. Simplicity for maintainability
+  2. Transparency for governance
+  3. Power for solving real business problems
+
+Result: An enterprise-grade staffing platform that humans trust and can defend.
+================================================================================
