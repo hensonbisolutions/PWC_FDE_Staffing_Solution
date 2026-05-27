@@ -20,10 +20,13 @@ from scripts.matching_engine import MatchingEngine
 def show_recommendations(data: dict):
     """Main recommendations page."""
     
-    st.markdown("# 🤖 AI-Assisted Staffing Recommendations")
-    st.markdown(
-        "Automated candidate matching with explainable scoring and human oversight"
-    )
+    st.markdown("""
+    <div class="hero-card">
+        <div class="hero-pill">AI-powered staffing</div>
+        <h1>AI-Assisted Staffing Recommendations</h1>
+        <p>Match the right talent to the right opportunity with transparent scoring, candidate context, and operational readiness.</p>
+    </div>
+    """, unsafe_allow_html=True)
     st.markdown("---")
     
     # Initialize matching engine

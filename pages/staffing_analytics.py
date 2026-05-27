@@ -21,8 +21,13 @@ import random
 def show_staffing_analytics(data: dict):
     """Main staffing analytics display."""
     
-    st.markdown("# 📊 Staffing Analytics - Performance Metrics")
-    st.markdown("Operational KPIs and performance tracking")
+    st.markdown("""
+    <div class="hero-card">
+        <div class="hero-pill">Performance analytics</div>
+        <h1>Staffing Analytics & KPI Dashboard</h1>
+        <p>Monitor operational performance, utilization, and staffing effectiveness with executive-level metrics.</p>
+    </div>
+    """, unsafe_allow_html=True)
     st.markdown("---")
     
     opportunities = data['opportunities']

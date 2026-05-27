@@ -22,8 +22,13 @@ from datetime import datetime, timedelta
 def show_dashboard(data: dict):
     """Main dashboard display function."""
     
-    st.markdown("# 📈 Workforce Analytics Dashboard")
-    st.markdown("Strategic view of organizational capability and capacity")
+    st.markdown("""
+    <div class="hero-card">
+        <div class="hero-pill">Enterprise workforce intelligence</div>
+        <h1>Workforce Analytics Dashboard</h1>
+        <p>Visualize skills, allocations, and capacity through executive-ready charts and strategic workforce insights.</p>
+    </div>
+    """, unsafe_allow_html=True)
     st.markdown("---")
     
     # Key metrics row

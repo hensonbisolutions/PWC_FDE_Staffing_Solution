@@ -20,8 +20,13 @@ from datetime import datetime, timedelta
 def show_allocation_optimizer(data: dict):
     """Main allocation optimizer display."""
     
-    st.markdown("# 🎯 Allocation Optimizer - Portfolio View")
-    st.markdown("Strategic team deployment analysis with risk identification")
+    st.markdown("""
+    <div class="hero-card">
+        <div class="hero-pill">Portfolio optimization</div>
+        <h1>Allocation Optimizer - Portfolio View</h1>
+        <p>Identify deployment risks, utilization gaps, and sector concentration across your workforce portfolio.</p>
+    </div>
+    """, unsafe_allow_html=True)
     st.markdown("---")
     
     # Calculate key metrics

@@ -21,8 +21,13 @@ from datetime import datetime, timedelta
 def show_allocation(data: dict):
     """Main allocation tracking page."""
     
-    st.markdown("# 📋 Workforce Allocation & Capacity Planning")
-    st.markdown("Track assignments, monitor capacity, and plan for upcoming needs")
+    st.markdown("""
+    <div class="hero-card">
+        <div class="hero-pill">Allocation command center</div>
+        <h1>Workforce Allocation & Capacity Planning</h1>
+        <p>Track current assignments, bench capacity, and future demand in one clean operational experience.</p>
+    </div>
+    """, unsafe_allow_html=True)
     st.markdown("---")
     
     # Summary metrics
